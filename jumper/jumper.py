@@ -2,9 +2,13 @@ import pygame
 import sys
 import os
 import random
+import pygame.mixer
 
 # Init
 pygame.init()
+#menu fonts
+menu_font = pygame.font.SysFont("Arial", 64)
+menu_option_font = pygame.font.SysFont("Arial", 48)
 #fonts
 font_small = pygame.font.SysFont("Arial", 32)
 font_large = pygame.font.SysFont("Arial", 72, bold=True)
@@ -13,11 +17,91 @@ WIDTH, HEIGHT = 1600, 800 #800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("2D Platformer")
 # World dimensions
-WORLD_WIDTH = 2000
+WORLD_WIDTH = 10000
 WORLD_HEIGHT = 5000
 background_image = pygame.image.load("background.png").convert()
-background_image = pygame.transform.scale(background_image, (800, 600))
+background_image = pygame.transform.scale(background_image, (1600, 800))
+
 fireballs = []
+
+# Initialize the mixer
+pygame.mixer.init()
+
+# Update the coin collection sound to use an MP3 file
+coin_sound = pygame.mixer.Sound('sprites/coin_collect.mp3')
+# Load death-by-fireball sound
+death_sound = pygame.mixer.Sound('sprites/death_by_fire_ball.mp3')
+
+def main_menu():
+    selected = 0
+    options = ["Play", "Quit"]
+
+    while True:
+        screen.fill((0, 0, 0))
+
+        title_text = menu_font.render("Jumper", True, (255, 255, 255))
+        screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, 100))
+
+        for i, option in enumerate(options):
+            color = (255, 255, 0) if i == selected else (255, 255, 255)
+            option_text = menu_option_font.render(option, True, color)
+            screen.blit(option_text, (WIDTH // 2 - option_text.get_width() // 2, 250 + i * 80))
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % len(options)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(options)
+                elif event.key == pygame.K_RETURN:
+                    if options[selected] == "Play":
+                        return  # Start game
+                    elif options[selected] == "Quit":
+                        pygame.quit()
+                        sys.exit()
+
+def pause_menu():
+    paused = True
+    selected = 0
+    options = ["Resume", "Quit to Main Menu"]
+
+    overlay = pygame.Surface((WIDTH, HEIGHT))
+    overlay.set_alpha(180)  # Semi-transparent
+    overlay.fill((0, 0, 0))  # Black overlay
+
+    while paused:
+        screen.blit(overlay, (0, 0))  # Transparent overlay
+
+        pause_text = menu_font.render("Paused", True, (255, 255, 255))
+        screen.blit(pause_text, (WIDTH // 2 - pause_text.get_width() // 2, 100))
+
+        for i, option in enumerate(options):
+            color = (255, 255, 0) if i == selected else (255, 255, 255)
+            option_text = menu_option_font.render(option, True, color)
+            screen.blit(option_text, (WIDTH // 2 - option_text.get_width() // 2, 250 + i * 80))
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % len(options)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(options)
+                elif event.key == pygame.K_RETURN:
+                    if options[selected] == "Resume":
+                        return
+                    elif options[selected] == "Quit to Main Menu":
+                        main_menu()
+                        return
 
 def load_enemy_images():
     images = []
@@ -100,9 +184,12 @@ def wait_for_restart():
         screen.fill(BLACK)
         screen.blit(text1, text1.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 40)))
         screen.blit(text2, text2.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 40)))
+        # Draw HUD background bar (top of screen)
+        hud_height = 60
+        pygame.draw.rect(screen, (0, 0, 0, 128), (0, 0, WIDTH, hud_height))  # semi-transparent black
         pygame.display.update()
         clock.tick(60)
-    
+
 class Enemy:
     def __init__(self, x, y, width, height, speed, images, patrol_min_x, patrol_max_x):
         self.rect = pygame.Rect(x, y, width, height)
@@ -121,11 +208,6 @@ class Enemy:
         if self.rect.x <= self.start_x or self.rect.x >= self.end_x:
             self.speed *= -1
             self.facing_right = not self.facing_right
-
-        self.frame_timer += 1
-        if self.frame_timer >= 6:
-            self.current_frame = (self.current_frame + 1) % len(self.images)
-            self.frame_timer = 0
 
         # Animate
         self.frame_timer += 1
@@ -158,11 +240,14 @@ class Enemy:
 # Place platforms with absolute Y values in the tall world
 base = WORLD_HEIGHT - 40  # ground level
 platforms = [
-    pygame.Rect(0, WORLD_HEIGHT - 40, 700, 40),       # Ground
+    pygame.Rect(0, WORLD_HEIGHT - 40, 700, 40),       # Ground 1
     pygame.Rect(800, WORLD_HEIGHT - 100, 200, 20),    # Platform 1
     pygame.Rect(1100, WORLD_HEIGHT - 200, 200, 20),   # Platform 2
     pygame.Rect(1400, WORLD_HEIGHT - 300, 200, 20),   # Platform 3
     pygame.Rect(1700, WORLD_HEIGHT - 400, 200, 20),   # Platform 4
+    pygame.Rect(2000, WORLD_HEIGHT - 500, 200, 20),   # Platform 5
+    pygame.Rect(2300, WORLD_HEIGHT - 600, 200, 20),
+    pygame.Rect(2600, WORLD_HEIGHT - 40, 8000, 40),   # Ground 2
 ]
 
 def regenerate_enemies():
@@ -171,8 +256,23 @@ def regenerate_enemies():
         create_enemy_on_platform(platforms[2], enemy_images),
         create_enemy_on_platform(platforms[3], enemy_images),
         create_enemy_on_platform(platforms[4], enemy_images),
+        create_enemy_on_platform(platforms[5], enemy_images),
+        create_enemy_on_platform(platforms[6], enemy_images),
+        create_enemy_on_platform(platforms[7], enemy_images),
+        create_enemy_on_platform(platforms[7], enemy_images),
     ]
 enemies = regenerate_enemies()
+
+class Coin:
+    def __init__(self, x, y):
+        self.rect = pygame.Rect(x, y, 20, 20)  # Size of the coin
+        self.collected = False
+
+    def draw(self, surface, camera_x, camera_y):
+        if not self.collected:
+            pygame.draw.circle(surface, (255, 215, 0),  # Gold color
+                               (self.rect.centerx - camera_x, self.rect.centery - camera_y), 10)
+
 coins = []
 
 def place_coins_on_platforms():
@@ -207,6 +307,7 @@ JUMP_STRENGTH = -15
 SPEED = 5
 
 player_fireballs = []
+
 class Player:
     def __init__(self, images):
         self.lives = 3
@@ -320,6 +421,11 @@ class Player:
                     print(f"Hit by fireball! Lives left: {self.lives}")
                     enemy.fireballs.remove(fireball)
                     if self.lives <= 0:
+                        # Play death sound for fatal fireball hit
+                        try:
+                            death_sound.play()
+                        except Exception:
+                            pass
                         fade_screen(screen, camera_x, camera_y, message="GAME OVER")
                         wait_for_restart()
                         self.lives = 3
@@ -333,16 +439,28 @@ class Player:
                     return  # Prevent multiple hits at once
         if hasattr(self, "fire_cooldown") and self.fire_cooldown > 0:
             self.fire_cooldown -= 1
+        # Check for coin collection
+        for coin in coins:
+            if not coin.collected and self.rect.colliderect(coin.rect):
+                coin.collected = True
+                self.coins += 1
+                coin_sound.play()
+                print(f"Coins: {self.coins}")
 
     def draw(self, surface, camera_x, camera_y):
         img = self.images[self.current_frame]
         # Draw lives counter in top-left
-        lives_text = font_small.render(f"Lives: {player.lives}", True, WHITE)
-        screen.blit(lives_text, (20, 20))
+        # Draw lives
+        lives_text = font_small.render(f"Lives: {self.lives}", True, WHITE)
+        surface.blit(lives_text, (20, 15))
+
+        # Draw coins counter in top-right
+        coins_text = font_small.render(f"Coins: {self.coins}", True, WHITE)
+        surface.blit(coins_text, (180, 15))
         if not self.facing_right:
             img = pygame.transform.flip(img, True, False)
         surface.blit(img, (self.rect.x - camera_x, self.rect.y - camera_y))
-    
+
     # Player Respawn
     def respawn(self):
         global enemies
@@ -351,6 +469,10 @@ class Player:
         enemies = regenerate_enemies()
         self.rect.topleft = (100, WORLD_HEIGHT - 150)
         self.vel = pygame.Vector2(0, 0)
+        global coins
+        coins.clear()
+        place_coins_on_platforms()
+        self.coins = 0  # Optional: reset coin count
 
     def shoot(self):
         if not hasattr(self, "fire_cooldown"):
@@ -361,15 +483,6 @@ class Player:
             player_fireballs.append(fb)
             self.fire_cooldown = 20  # cooldown in frames
 
-class Coin:
-    def __init__(self, x, y):
-        self.rect = pygame.Rect(x, y, 20, 20)  # Size of the coin
-        self.collected = False
-
-    def draw(self, surface, camera_x, camera_y):
-        if not self.collected:
-            pygame.draw.circle(surface, (255, 215, 0),  # Gold color
-                               (self.rect.centerx - camera_x, self.rect.centery - camera_y), 10)
 
 class Fireball:
     def __init__(self, x, y, direction, is_player=False):
@@ -397,16 +510,24 @@ camera_y = 0
 # Ensure camera_x and camera_y are within bounds
 camera_x = max(0, min(camera_x, WORLD_WIDTH - WIDTH))
 camera_y = max(0, min(camera_y, WORLD_HEIGHT - HEIGHT))
+
+main_menu()
 # Game loop
 while True:
     draw_world(screen, camera_x, camera_y)
     camera_x = player.rect.centerx - WIDTH // 2
     camera_y = player.rect.centery - HEIGHT // 2
+    # Draw HUD background bar (top of screen)
+    hud_height = 60
+    pygame.draw.rect(screen, (0, 0, 0, 128), (0, 0, WIDTH, hud_height))  # semi-transparent black
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                pause_menu()
 
     # Update player
     player.update(platforms)
@@ -433,6 +554,9 @@ while True:
     # Draw player fireballs
     for fb in player_fireballs:
         fb.draw(screen, camera_x, camera_y)
+    # Draw coins
+    for coin in coins:
+        coin.draw(screen, camera_x, camera_y)
 
     # Draw player (after enemies so it appears in front)
     player.draw(screen, camera_x, camera_y)
@@ -444,6 +568,7 @@ while True:
         plat.width,
         plat.height
 )
+    
         pygame.draw.rect(screen, GREEN, offset_rect)
 
     pygame.display.flip()
