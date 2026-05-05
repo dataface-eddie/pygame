@@ -42,6 +42,7 @@ jump_sound = pygame.mixer.Sound('sprites/jump_sound.mp3')
 #Load Firenball Sound
 fireball_sound_1 = pygame.mixer.Sound('sprites/fireball_sound_1.mp3')
 fireball_sound_2 = pygame.mixer.Sound('sprites/fireball_sound_2.mp3')
+fireball_hit_enemy_sound = pygame.mixer.Sound('sprites/steam_hissing.mp3')
 
 def main_menu():
     selected = 0
@@ -561,6 +562,7 @@ while True:
             # Check collision with enemies
             for enemy in enemies[:]:
                 if fb.rect.colliderect(enemy.rect):
+                    fireball_hit_enemy_sound.play()
                     enemies.remove(enemy)
                     if fb in player_fireballs:
                         player_fireballs.remove(fb)
