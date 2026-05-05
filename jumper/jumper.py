@@ -30,7 +30,18 @@ pygame.mixer.init()
 # Update the coin collection sound to use an MP3 file
 coin_sound = pygame.mixer.Sound('sprites/coin_collect.mp3')
 # Load death-by-fireball sound
-death_sound = pygame.mixer.Sound('sprites/death_by_fire_ball.mp3')
+death_by_fire_ball_sound = pygame.mixer.Sound('sprites/death_by_fire_ball.mp3')
+# Load monster roar sound
+monster_roar_sound = pygame.mixer.Sound('sprites/monster_roar.mp3')
+# Load dramatic_synth_echo sound
+dramatic_synth_echo_sound = pygame.mixer.Sound('sprites/dramatic_synth_echo.mp3')
+# Load game_over Music 
+game_over_music = pygame.mixer.Sound('sprites/game_over_music.mp3')
+# Load Jump Sound
+jump_sound = pygame.mixer.Sound('sprites/jump_sound.mp3')
+#Load Firenball Sound
+fireball_sound_1 = pygame.mixer.Sound('sprites/fireball_sound_1.mp3')
+fireball_sound_2 = pygame.mixer.Sound('sprites/fireball_sound_2.mp3')
 
 def main_menu():
     selected = 0
@@ -277,8 +288,8 @@ coins = []
 
 def place_coins_on_platforms():
     for plat in platforms[1:]:  # skip ground
-        # Place 1–2 coins randomly on the platform
-        for _ in range(random.randint(1, 2)):
+        # Place 1–10 coins randomly on the platform
+        for _ in range(random.randint(1, 10)):
             x = random.randint(plat.left + 10, plat.right - 30)
             y = plat.top - 25  # slightly above the platform
             coins.append(Coin(x, y))
@@ -329,6 +340,7 @@ class Player:
             self.vel.x = SPEED
         if keys[pygame.K_SPACE] and self.on_ground:
             self.vel.y = JUMP_STRENGTH
+            jump_sound.play()
         if self.vel.x > 0:
             self.facing_right = True
         elif self.vel.x < 0:
@@ -336,6 +348,7 @@ class Player:
 
         if keys[pygame.K_f]:
             self.shoot()
+            fireball_sound_1.play()
 
     def apply_gravity(self):
         self.vel.y += GRAVITY
@@ -388,9 +401,11 @@ class Player:
         else:
             self.current_frame = 0  # Idle frame
         if self.rect.top > WORLD_HEIGHT + 200:  # Kill plane
+            dramatic_synth_echo_sound.play()
             self.lives -= 1
             print(f"You Died. Lives left: {self.lives}")
             if self.lives <= 0:
+                game_over_music.play()
                 fade_screen(screen, camera_x, camera_y, message="GAME OVER")
                 wait_for_restart()
                 self.lives = 3
@@ -403,29 +418,29 @@ class Player:
                 fade_screen(screen, camera_x, camera_y, fade_in=True)
         for enemy in enemies:
             if self.rect.colliderect(enemy.rect):
+                monster_roar_sound.play()
                 self.lives -= 1
                 print(f"Hit by enemy! Lives left: {self.lives}")
                 if self.lives <= 0:
+                    game_over_music.play()
                     fade_screen(screen, camera_x, camera_y, message="GAME OVER")
                     wait_for_restart()
                     self.lives = 3
                 else:
                     fade_screen(screen, camera_x, camera_y, message="YOU DIED")
+                    pygame.time.delay(1000)
                 self.respawn()
                 fade_screen(screen, camera_x, camera_y, fade_in=True)
                 break
         for enemy in enemies:
             for fireball in enemy.fireballs:
                 if self.rect.colliderect(fireball.rect):
+                    death_by_fire_ball_sound.play()
                     self.lives -= 1
                     print(f"Hit by fireball! Lives left: {self.lives}")
                     enemy.fireballs.remove(fireball)
                     if self.lives <= 0:
-                        # Play death sound for fatal fireball hit
-                        try:
-                            death_sound.play()
-                        except Exception:
-                            pass
+                        game_over_music.play()
                         fade_screen(screen, camera_x, camera_y, message="GAME OVER")
                         wait_for_restart()
                         self.lives = 3
@@ -433,7 +448,7 @@ class Player:
                         fade_screen(screen, camera_x, camera_y, fade_in=True)
                     else:
                         fade_screen(screen, camera_x, camera_y, message="YOU DIED")
-                        pygame.time.delay(500)
+                        pygame.time.delay(1000)
                         self.respawn()
                         fade_screen(screen, camera_x, camera_y, fade_in=True)
                     return  # Prevent multiple hits at once
