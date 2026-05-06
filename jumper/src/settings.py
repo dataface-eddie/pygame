@@ -1,0 +1,18 @@
+# Game constants
+WIDTH = 1600
+HEIGHT = 800
+WORLD_WIDTH = 10000
+WORLD_HEIGHT = 5000
+
+FPS = 60
+
+# Physics
+GRAVITY = 0.5
+JUMP_STRENGTH = -15
+SPEED = 5
+
+# Colors
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
